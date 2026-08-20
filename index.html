@@ -227,6 +227,10 @@ function addMeasure(btn) {
             <b>بند جديد</b>
             <button type="button" class="del" onclick="this.closest('.measure').remove(); renumberMeasures(this.closest('.street')); calc();">حذف</button>
         </div>
+        <div class="field" style="margin-top:6px">
+            <label>اسم البند</label>
+            <input class="measureName" placeholder="أدخل اسم البند">
+        </div>
         <div class="measureTableWrap">
             <table class="measureTable">
                 <thead>
@@ -429,8 +433,10 @@ function buildSurveyReportObject() {
                 rows.push({ length: len, widths: widthsArr, avgWidth: avgWid, area: area });
             });
 
+            const measureName = m.querySelector('.measureName')?.value.trim() || `بند ${mIdx + 1}`;
             measures.push({
                 index: mIdx + 1,
+                name: measureName,
                 rows: rows,
                 area: measureArea
             });
@@ -607,13 +613,13 @@ function prepareAndPrint() {
     let html = `
     <div style="text-align:center; margin-bottom: 20px;">
         <h2>نموذج حصر الكميات والمساحات — ${report.site.project || 'غير محدد'}</h2>
-        <p>رقم الحصر: ${report.site.surveyNo} | التاريخ: ${report.site.date} | المساح: ${report.site.surveyor || 'غير محدد'}</p>
+        <p>التاريخ: ${report.site.date} | المساح: ${report.site.surveyor || 'غير محدد'}</p>
     </div>
     <table style="width:100%; border-collapse: collapse; text-align: center; font-size: 14px;" border="1">
         <thead>
             <tr style="background:#f1f2f4; font-weight:bold;">
                 <th style="padding:8px; border:1px solid #000;">الشارع</th>
-                <th style="padding:8px; border:1px solid #000;">البند</th>
+                <th style="padding:8px; border:1px solid #000;">اسم البند</th>
                 <th style="padding:8px; border:1px solid #000;">م</th>
                 <th style="padding:8px; border:1px solid #000;">الطول (م)</th>`;
     
@@ -631,7 +637,7 @@ function prepareAndPrint() {
             m.rows.forEach((r, idx) => {
                 html += `<tr>
                     <td style="padding:6px; border:1px solid #000;">${str.name}</td>
-                    <td style="padding:6px; border:1px solid #000;">بند ${m.index}</td>
+                    <td style="padding:6px; border:1px solid #000;">${m.name}</td>
                     <td style="padding:6px; border:1px solid #000;">${idx + 1}</td>
                     <td style="padding:6px; border:1px solid #000;">${r.length}</td>`;
                 
@@ -686,7 +692,7 @@ function exportToExcel() {
     });
 
     let csvContent = "\uFEFF"; // BOM for Arabic support in Excel
-    csvContent += "الشارع,البند,م,الطول (م),";
+    csvContent += "الشارع,اسم البند,م,الطول (م),";
     for (let i = 1; i <= maxWids; i++) {
         csvContent += `العرض ${i} (م),`;
     }
@@ -695,7 +701,7 @@ function exportToExcel() {
     report.streets.forEach(str => {
         str.measures.forEach(m => {
             m.rows.forEach((r, idx) => {
-                csvContent += `"${str.name}","بند ${m.index}",${idx + 1},${r.length},`;
+                csvContent += `"${str.name}","${m.name}",${idx + 1},${r.length},`;
                 for (let i = 0; i < maxWids; i++) {
                     csvContent += `${r.widths[i] !== undefined ? r.widths[i] : ''},`;
                 }
