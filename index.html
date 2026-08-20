@@ -68,6 +68,9 @@ textarea{min-height:80px}
 @media print{
   @page{size:A4 landscape;margin:10mm}
   body{background:#fff}
+  body.excel-print-mode .wrap { display: none !important; }
+  body.excel-print-mode #excelPrintArea { display: block !important; }
+  #excelPrintArea { display: none; }
   .wrap{max-width:none;padding:0}
   .brand,.card{box-shadow:none;border-radius:0}
   .btn,.send,.send-wa,.alert-box{display:none!important}
@@ -83,8 +86,10 @@ textarea{min-height:80px}
   .widths{flex-wrap:nowrap}
   .widthrow input{width:72px;min-width:72px}
   .widthrow:before{font-size:9px}
+  .widthrow:before{font-size:9px}
   .printOnly{display:block;text-align:center;margin:4px 0 10px;font-weight:800;font-size:18px}
 }
+#excelPrintArea { display: none; }
 </style>
 </head>
 <body>
@@ -171,6 +176,7 @@ textarea{min-height:80px}
 
 <div class="card">
 <button type="button" class="btn send" onclick="prepareAndPrint()">🖨️ إنشاء الحصر للطباعة / PDF</button>
+<button type="button" class="btn send" style="background:#217346; margin-top:8px;" onclick="exportToExcel()">📊 تصدير كملف إكسيل (Excel)</button>
 <button type="button" class="btn send-wa" onclick="handleSurveySubmission()">📲 إرسال التقرير الكامل على واتساب</button>
 </div>
 </form>
@@ -236,7 +242,8 @@ function addMeasure(btn) {
                     <tr>
                         <th>م</th>
                         <th>الطول (م)</th>
-                        <th>العرض (م)</th>
+                        <th>العروض (م)</th>
+                        <th>المتوسط (م)</th>
                         <th>المساحة (م²)</th>
                         <th><button type="button" class="btn add" style="padding:2px 8px;font-size:12px;border-radius:6px;" onclick="addMeasureRow(this)">+ صف</button></th>
                     </tr>
@@ -245,7 +252,13 @@ function addMeasure(btn) {
                     <tr class="m-row">
                         <td class="rowNo">1</td>
                         <td><input class="len" type="number" step="0.01" min="0" inputmode="decimal" oninput="calc()" placeholder="الطول"></td>
-                        <td><input class="wid" type="number" step="0.01" min="0" inputmode="decimal" oninput="calc()" placeholder="العرض"></td>
+                        <td>
+                            <div class="widths">
+                                <input class="wid" type="number" step="0.01" min="0" inputmode="decimal" oninput="calc()" placeholder="عرض" style="width:70px;min-width:70px;">
+                                <button type="button" class="btn add" style="padding:2px 8px;font-size:16px;border-radius:6px;margin:0;line-height:1;" onclick="addWidthToRow(this)">+</button>
+                            </div>
+                        </td>
+                        <td><b class="avg">0.00 م</b></td>
                         <td><b class="qty">0.00 م²</b></td>
                         <td></td>
                     </tr>
@@ -273,7 +286,13 @@ function addMeasureRow(btn) {
     tr.innerHTML = `
         <td class="rowNo"></td>
         <td><input class="len" type="number" step="0.01" min="0" inputmode="decimal" oninput="calc()" placeholder="الطول"></td>
-        <td><input class="wid" type="number" step="0.01" min="0" inputmode="decimal" oninput="calc()" placeholder="العرض"></td>
+        <td>
+            <div class="widths">
+                <input class="wid" type="number" step="0.01" min="0" inputmode="decimal" oninput="calc()" placeholder="عرض" style="width:70px;min-width:70px;">
+                <button type="button" class="btn add" style="padding:2px 8px;font-size:16px;border-radius:6px;margin:0;line-height:1;" onclick="addWidthToRow(this)">+</button>
+            </div>
+        </td>
+        <td><b class="avg">0.00 م</b></td>
         <td><b class="qty">0.00 م²</b></td>
         <td><button type="button" class="del" onclick="this.closest('tr').remove(); renumberRows(this.closest('tbody')); calc();">×</button></td>
     `;
@@ -290,6 +309,20 @@ function renumberRows(tbody) {
     });
 }
 
+function addWidthToRow(btn) {
+    const input = document.createElement('input');
+    input.className = 'wid';
+    input.type = 'number';
+    input.step = '0.01';
+    input.min = '0';
+    input.inputmode = 'decimal';
+    input.placeholder = 'عرض';
+    input.style.width = '70px';
+    input.style.minWidth = '70px';
+    input.oninput = calc;
+    btn.parentNode.insertBefore(input, btn);
+}
+
 // --- Live Calculations ---
 function calc() {
     let totalLenSum = 0;
@@ -303,8 +336,27 @@ function calc() {
 
             m.querySelectorAll('.m-row').forEach(row => {
                 const len = parseFloat(row.querySelector('.len')?.value) || 0;
-                const wid = parseFloat(row.querySelector('.wid')?.value) || 0;
-                const area = len * wid;
+                
+                let wInputs = row.querySelectorAll('.wid');
+                let sumWid = 0;
+                let countWid = 0;
+                wInputs.forEach(wInp => {
+                    let valStr = wInp.value;
+                    if (valStr && valStr.trim() !== '') {
+                        sumWid += parseFloat(valStr) || 0;
+                        countWid++;
+                    }
+                });
+                
+                let avgWid = 0;
+                if (countWid > 0) {
+                    avgWid = sumWid / countWid;
+                }
+
+                const area = len * avgWid;
+
+                const avgEl = row.querySelector('.avg');
+                if (avgEl) avgEl.textContent = avgWid.toFixed(2) + ' م';
 
                 const qtyEl = row.querySelector('.qty');
                 if (qtyEl) qtyEl.textContent = area.toFixed(2) + ' م²';
@@ -354,20 +406,40 @@ function buildSurveyReportObject() {
         const measures = [];
         let streetAreaSum = 0;
 
-        s.querySelectorAll('.measure').forEach(m => {
+        s.querySelectorAll('.measure').forEach((m, mIdx) => {
             const rows = [];
             let measureArea = 0;
 
             m.querySelectorAll('.m-row').forEach(row => {
                 const len = parseFloat(row.querySelector('.len')?.value) || 0;
-                const wid = parseFloat(row.querySelector('.wid')?.value) || 0;
-                const area = len * wid;
+                
+                let wInputs = row.querySelectorAll('.wid');
+                let sumWid = 0;
+                let countWid = 0;
+                let widthsArr = [];
+                wInputs.forEach(wInp => {
+                    let valStr = wInp.value;
+                    if (valStr && valStr.trim() !== '') {
+                        let val = parseFloat(valStr) || 0;
+                        sumWid += val;
+                        countWid++;
+                        widthsArr.push(val);
+                    }
+                });
+                
+                let avgWid = 0;
+                if (countWid > 0) {
+                    avgWid = sumWid / countWid;
+                }
+
+                const area = len * avgWid;
                 measureArea += area;
                 streetAreaSum += area;
-                rows.push({ length: len, width: wid, area: area });
+                rows.push({ length: len, widths: widthsArr, avgWidth: avgWid, area: area });
             });
 
             measures.push({
+                index: mIdx + 1,
                 rows: rows,
                 area: measureArea
             });
@@ -460,7 +532,11 @@ function formatWhatsAppReport(report) {
         str.measures.forEach((m, j) => {
             msg += `   └ بند ${j + 1}:\n`;
             m.rows.forEach((r, k) => {
-                msg += `      - صف ${k + 1}: طول ${r.length.toFixed(2)}م × عرض ${r.width.toFixed(2)}م = ${r.area.toFixed(2)} م²\n`;
+                let wText = r.avgWidth.toFixed(2);
+                if (r.widths.length > 1) {
+                    wText = `(${r.widths.map(w => w.toFixed(2)).join(' + ')})/${r.widths.length} = ${r.avgWidth.toFixed(2)}`;
+                }
+                msg += `      - صف ${k + 1}: طول ${r.length.toFixed(2)}م × عرض ${wText}م = ${r.area.toFixed(2)} م²\n`;
             });
             msg += `      (إجمالي البند: ${m.area.toFixed(2)} م²)\n`;
         });
@@ -524,7 +600,128 @@ function handleSurveySubmission() {
 
 function prepareAndPrint() {
     calc();
+    const report = buildSurveyReportObject();
+    
+    let maxWids = 1;
+    report.streets.forEach(str => {
+        str.measures.forEach(m => {
+            m.rows.forEach(r => {
+                if (r.widths.length > maxWids) {
+                    maxWids = r.widths.length;
+                }
+            });
+        });
+    });
+
+    let html = `
+    <div style="text-align:center; margin-bottom: 20px;">
+        <h2>نموذج حصر الكميات والمساحات — ${report.site.project || 'غير محدد'}</h2>
+        <p>رقم الحصر: ${report.site.surveyNo} | التاريخ: ${report.site.date} | المساح: ${report.site.surveyor || 'غير محدد'}</p>
+    </div>
+    <table style="width:100%; border-collapse: collapse; text-align: center; font-size: 14px;" border="1">
+        <thead>
+            <tr style="background:#f1f2f4; font-weight:bold;">
+                <th style="padding:8px; border:1px solid #000;">الشارع</th>
+                <th style="padding:8px; border:1px solid #000;">البند</th>
+                <th style="padding:8px; border:1px solid #000;">م</th>
+                <th style="padding:8px; border:1px solid #000;">الطول (م)</th>`;
+    
+    for (let i = 1; i <= maxWids; i++) {
+        html += `<th style="padding:8px; border:1px solid #000;">العرض ${i} (م)</th>`;
+    }
+    html += `<th style="padding:8px; border:1px solid #000;">متوسط العرض (م)</th>
+             <th style="padding:8px; border:1px solid #000;">المساحة (م²)</th>
+            </tr>
+        </thead>
+        <tbody>`;
+        
+    report.streets.forEach(str => {
+        str.measures.forEach(m => {
+            m.rows.forEach((r, idx) => {
+                html += `<tr>
+                    <td style="padding:6px; border:1px solid #000;">${str.name}</td>
+                    <td style="padding:6px; border:1px solid #000;">بند ${m.index}</td>
+                    <td style="padding:6px; border:1px solid #000;">${idx + 1}</td>
+                    <td style="padding:6px; border:1px solid #000;">${r.length}</td>`;
+                
+                for (let i = 0; i < maxWids; i++) {
+                    let wVal = r.widths[i] !== undefined ? parseFloat(r.widths[i]) : '';
+                    html += `<td style="padding:6px; border:1px solid #000;">${wVal !== '' ? wVal.toFixed(2) : ''}</td>`;
+                }
+                
+                html += `<td style="padding:6px; border:1px solid #000;">${r.avgWidth.toFixed(2)}</td>
+                         <td style="padding:6px; border:1px solid #000;">${r.area.toFixed(2)}</td>
+                </tr>`;
+            });
+        });
+    });
+    
+    html += `</tbody></table>
+    <div style="margin-top: 20px; font-size: 16px; font-weight: bold; border: 1px solid #000; padding: 10px; display: flex; justify-content: space-around;">
+        <span>إجمالي الأطوال: ${report.summary.totalLength.toFixed(2)} م</span>
+        <span>إجمالي المساحة / الكمية: ${report.summary.totalQty.toFixed(2)} م²</span>
+    </div>`;
+
+    let printArea = document.getElementById('excelPrintArea');
+    if (!printArea) {
+        printArea = document.createElement('div');
+        printArea.id = 'excelPrintArea';
+        document.body.appendChild(printArea);
+    }
+    printArea.innerHTML = html;
+    
+    document.body.classList.add('excel-print-mode');
     window.print();
+    
+    // Small timeout to allow print dialog to render before removing class
+    setTimeout(() => {
+        document.body.classList.remove('excel-print-mode');
+    }, 500);
+}
+
+function exportToExcel() {
+    calc();
+    const report = buildSurveyReportObject();
+    
+    let maxWids = 1;
+    report.streets.forEach(str => {
+        str.measures.forEach(m => {
+            m.rows.forEach(r => {
+                if (r.widths.length > maxWids) {
+                    maxWids = r.widths.length;
+                }
+            });
+        });
+    });
+
+    let csvContent = "\uFEFF"; // BOM for Arabic support in Excel
+    csvContent += "الشارع,البند,م,الطول (م),";
+    for (let i = 1; i <= maxWids; i++) {
+        csvContent += `العرض ${i} (م),`;
+    }
+    csvContent += "متوسط العرض (م),المساحة (م²)\n";
+    
+    report.streets.forEach(str => {
+        str.measures.forEach(m => {
+            m.rows.forEach((r, idx) => {
+                csvContent += `"${str.name}","بند ${m.index}",${idx + 1},${r.length},`;
+                for (let i = 0; i < maxWids; i++) {
+                    csvContent += `${r.widths[i] !== undefined ? r.widths[i] : ''},`;
+                }
+                csvContent += `${r.avgWidth},${r.area}\n`;
+            });
+        });
+    });
+    
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const link = document.createElement("a");
+    const url = URL.createObjectURL(blob);
+    link.setAttribute("href", url);
+    link.setAttribute("download", `حصر_${report.site.project || 'كميات'}.csv`);
+    link.style.visibility = 'hidden';
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
 }
 </script>
 </body>
