@@ -238,14 +238,16 @@ function addMeasure(btn) {
                         <th>الطول (م)</th>
                         <th>العرض (م)</th>
                         <th>المساحة (م²)</th>
+                        <th><button type="button" class="btn add" style="padding:2px 8px;font-size:12px;border-radius:6px;" onclick="addMeasureRow(this)">+ صف</button></th>
                     </tr>
                 </thead>
                 <tbody>
-                    <tr>
-                        <td class="measureNo">1</td>
+                    <tr class="m-row">
+                        <td class="rowNo">1</td>
                         <td><input class="len" type="number" step="0.01" min="0" inputmode="decimal" oninput="calc()" placeholder="الطول"></td>
                         <td><input class="wid" type="number" step="0.01" min="0" inputmode="decimal" oninput="calc()" placeholder="العرض"></td>
                         <td><b class="qty">0.00 م²</b></td>
+                        <td></td>
                     </tr>
                 </tbody>
             </table>
@@ -259,10 +261,32 @@ function addMeasure(btn) {
 function renumberMeasures(streetEl) {
     if (!streetEl) return;
     streetEl.querySelectorAll('.measure').forEach((m, i) => {
-        const noEl = m.querySelector('.measureNo');
-        if (noEl) noEl.textContent = i + 1;
         const head = m.querySelector('.measurehead b');
         if (head) head.textContent = 'بند ' + (i + 1);
+    });
+}
+
+function addMeasureRow(btn) {
+    const tbody = btn.closest('table').querySelector('tbody');
+    const tr = document.createElement('tr');
+    tr.className = 'm-row';
+    tr.innerHTML = `
+        <td class="rowNo"></td>
+        <td><input class="len" type="number" step="0.01" min="0" inputmode="decimal" oninput="calc()" placeholder="الطول"></td>
+        <td><input class="wid" type="number" step="0.01" min="0" inputmode="decimal" oninput="calc()" placeholder="العرض"></td>
+        <td><b class="qty">0.00 م²</b></td>
+        <td><button type="button" class="del" onclick="this.closest('tr').remove(); renumberRows(this.closest('tbody')); calc();">×</button></td>
+    `;
+    tbody.appendChild(tr);
+    renumberRows(tbody);
+    calc();
+}
+
+function renumberRows(tbody) {
+    if (!tbody) return;
+    tbody.querySelectorAll('.m-row').forEach((row, i) => {
+        const noEl = row.querySelector('.rowNo');
+        if (noEl) noEl.textContent = i + 1;
     });
 }
 
@@ -277,16 +301,18 @@ function calc() {
         s.querySelectorAll('.measure').forEach((m, idx) => {
             totalMeasuresCount++;
 
-            const len = parseFloat(m.querySelector('.len')?.value) || 0;
-            const wid = parseFloat(m.querySelector('.wid')?.value) || 0;
-            const area = len * wid;
+            m.querySelectorAll('.m-row').forEach(row => {
+                const len = parseFloat(row.querySelector('.len')?.value) || 0;
+                const wid = parseFloat(row.querySelector('.wid')?.value) || 0;
+                const area = len * wid;
 
-            const qtyEl = m.querySelector('.qty');
-            if (qtyEl) qtyEl.textContent = area.toFixed(2) + ' م²';
+                const qtyEl = row.querySelector('.qty');
+                if (qtyEl) qtyEl.textContent = area.toFixed(2) + ' م²';
 
-            totalLenSum += len;
-            streetQtySum += area;
-            totalQtySum += area;
+                totalLenSum += len;
+                streetQtySum += area;
+                totalQtySum += area;
+            });
         });
 
         const streetTotEl = s.querySelector('.streetTotal');
@@ -329,15 +355,21 @@ function buildSurveyReportObject() {
         let streetAreaSum = 0;
 
         s.querySelectorAll('.measure').forEach(m => {
-            const len = parseFloat(m.querySelector('.len')?.value) || 0;
-            const wid = parseFloat(m.querySelector('.wid')?.value) || 0;
-            const area = len * wid;
-            streetAreaSum += area;
+            const rows = [];
+            let measureArea = 0;
+
+            m.querySelectorAll('.m-row').forEach(row => {
+                const len = parseFloat(row.querySelector('.len')?.value) || 0;
+                const wid = parseFloat(row.querySelector('.wid')?.value) || 0;
+                const area = len * wid;
+                measureArea += area;
+                streetAreaSum += area;
+                rows.push({ length: len, width: wid, area: area });
+            });
 
             measures.push({
-                length: len,
-                width: wid,
-                area: area
+                rows: rows,
+                area: measureArea
             });
         });
 
@@ -348,7 +380,7 @@ function buildSurveyReportObject() {
         });
     });
 
-    const totalLength = streets.reduce((acc, str) => acc + str.measures.reduce((mAcc, m) => mAcc + m.length, 0), 0);
+    const totalLength = streets.reduce((acc, str) => acc + str.measures.reduce((mAcc, m) => mAcc + m.rows.reduce((rAcc, r) => rAcc + r.length, 0), 0), 0);
     const totalQty = streets.reduce((acc, str) => acc + str.totalArea, 0);
 
     return {
@@ -426,7 +458,11 @@ function formatWhatsAppReport(report) {
     report.streets.forEach((str, i) => {
         msg += `*${i + 1}. ${str.name}:*\n`;
         str.measures.forEach((m, j) => {
-            msg += `   └ بند ${j + 1}: طول ${m.length.toFixed(2)}م × عرض ${m.width.toFixed(2)}م = ${m.area.toFixed(2)} م²\n`;
+            msg += `   └ بند ${j + 1}:\n`;
+            m.rows.forEach((r, k) => {
+                msg += `      - صف ${k + 1}: طول ${r.length.toFixed(2)}م × عرض ${r.width.toFixed(2)}م = ${r.area.toFixed(2)} م²\n`;
+            });
+            msg += `      (إجمالي البند: ${m.area.toFixed(2)} م²)\n`;
         });
         msg += `   ← *إجمالي الشارع:* ${str.totalArea.toFixed(2)} م²\n\n`;
     });
