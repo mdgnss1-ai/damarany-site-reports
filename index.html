@@ -567,11 +567,20 @@
                 <button type="button" class="btn add" onclick="addStreet()">＋ إضافة شارع جديد</button>
             </div>
 
-            <div class="card">
+            <div class="card" id="kerbCard" style="display:none;">
                 <div class="head">
-                    <h2>البردورة <span style="font-size:13px; font-weight:normal;">(اختياري)</span></h2>
+                    <h2>جدول بند وشارع <span style="font-size:13px; font-weight:normal;">(اختياري)</span></h2>
+                    <button type="button" class="del" onclick="removeKerbTable()">حذف الجدول</button>
                 </div>
-                <div style="overflow-x:auto;">
+                <div class="field">
+                    <label for="kerbItemName">اسم البند</label>
+                    <input id="kerbItemName" placeholder="اكتب اسم البند">
+                </div>
+                <div class="field" style="margin-top:10px;">
+                    <label for="kerbStreetName">اسم الشارع</label>
+                    <input id="kerbStreetName" placeholder="اكتب اسم الشارع">
+                </div>
+                <div style="margin-top:15px; overflow-x:auto;">
                     <table class="measureTable">
                         <thead>
                             <tr>
@@ -584,7 +593,11 @@
                         <tbody id="kerbSummaryBody"></tbody>
                     </table>
                 </div>
-                <button type="button" class="btn add" style="margin-top:12px;" onclick="addKerbSummaryRow()">+ إضافة بند </button>
+                <button type="button" class="btn add" style="margin-top:12px;" onclick="addKerbSummaryRow()">+ إضافة بند للجدول</button>
+            </div>
+
+            <div class="card" id="addKerbCard">
+                <button type="button" class="btn add" onclick="showKerbTable()">+ إضافة جدول بند وشارع</button>
             </div>
 
             <div class="card">
@@ -678,6 +691,27 @@
                 <td><input type="text" placeholder="وحدة القياس"></td>
                 <td><button type="button" class="del" onclick="this.closest('tr').remove()">حذف</button></td>`;
             tbody.appendChild(row);
+        }
+
+        function showKerbTable() {
+            const tableCard = document.getElementById('kerbCard');
+            const addCard = document.getElementById('addKerbCard');
+            if (tableCard) tableCard.style.display = 'block';
+            if (addCard) addCard.style.display = 'none';
+        }
+
+        function removeKerbTable() {
+            const tableCard = document.getElementById('kerbCard');
+            const addCard = document.getElementById('addKerbCard');
+            const itemName = document.getElementById('kerbItemName');
+            const streetName = document.getElementById('kerbStreetName');
+            const tbody = document.getElementById('kerbSummaryBody');
+
+            if (itemName) itemName.value = '';
+            if (streetName) streetName.value = '';
+            if (tbody) tbody.innerHTML = '';
+            if (tableCard) tableCard.style.display = 'none';
+            if (addCard) addCard.style.display = 'block';
         }
 
         function addStreet() {
@@ -1128,7 +1162,7 @@
                 str.measures.forEach(m => {
                     const widthCount = Math.max(1, ...m.rows.map(r => r.widths.length));
                     html += `<section style="margin: 18px 0 24px; page-break-inside: avoid;">
-                    <div style="font-size:14px; margin-bottom:4px;">الشارع: <strong>${str.name}</strong></div>
+                    <div style="font-size:16px; margin-bottom:4px;">الشارع: <strong>${str.name}</strong></div>
                     <div style="font-size:16px; font-weight:bold; margin-bottom:8px;">اسم البند: ${m.name}</div>
                     <table style="width:100%; border-collapse: collapse; text-align: center; font-size: 14px;" border="1">
                     <thead><tr style="background:#f1f2f4; font-weight:bold;">
@@ -1169,13 +1203,16 @@
             const escapePrintHtml = value => String(value || '').replace(/[&<>"']/g, char => ({
                 '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
             })[char]);
+            const kerbItemName = document.getElementById('kerbItemName')?.value.trim() || '';
+            const kerbStreetName = document.getElementById('kerbStreetName')?.value.trim() || '';
             const kerbRows = [...document.querySelectorAll('#kerbSummaryBody tr')].map(row =>
                 [...row.querySelectorAll('input')].map(input => input.value.trim())
             );
 
-            if (kerbRows.some(row => row.some(value => value))) {
+            if (kerbItemName || kerbStreetName || kerbRows.some(row => row.some(value => value))) {
                 html += `<section style="margin: 24px 0 0; page-break-inside: avoid;">
-                    <div style="font-size:16px; font-weight:bold; margin-bottom:8px;">البردورة</div>
+                    <div style="font-size:16px; font-weight:bold; margin-bottom:4px;">اسم البند: ${escapePrintHtml(kerbItemName || 'غير محدد')}</div>
+                    <div style="font-size:16px; font-weight:bold; margin-bottom:8px;">اسم الشارع: ${escapePrintHtml(kerbStreetName || 'غير محدد')}</div>
                     <table style="width:100%; border-collapse:collapse; text-align:center; font-size:14px;" border="1">
                         <thead><tr style="background:#f1f2f4; font-weight:bold;">
                             <th style="padding:8px; border:1px solid #000;">اسم البند</th>
